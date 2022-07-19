@@ -1,5 +1,5 @@
 from multiprocessing import current_process
-from typing import Optional
+from typing import Optional, List
 import click
 from fastapi import Body, FastAPI, Response, status, HTTPException, Depends
 from pydantic import BaseModel
@@ -8,7 +8,7 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 import time 
 from sqlalchemy.orm import Session
-from . import models
+from . import models, schemas
 from .database import engine, get_db
 
 
@@ -17,14 +17,6 @@ models.Base.metadata.create_all(bind=engine)
 click.clear() # fix color codes on terminal
 
 app = FastAPI()
-
-
-# body validation (using pydantic)
-class Post(BaseModel):
-    title: str
-    content: str
-    published: bool = True
-    # rating: Optional[int] = None
 
 
 while True:
@@ -68,14 +60,7 @@ def root():
     return {"message": "Hello World"}
 
 
-@app.get("/sqlalchemy")
-def test_posts(db: Session = Depends(get_db)):
-
-    posts = db.query(models.Post).all()
-    return {"data": posts}
-
-
-@app.get("/posts")
+@app.get("/posts", response_model=List[schemas.Post])
 def get_posts(db: Session = Depends(get_db)):
     
     # ? (old) regular SQL method for database query
@@ -84,11 +69,11 @@ def get_posts(db: Session = Depends(get_db)):
 
     # ? using ORM for database query
     posts = db.query(models.Post).all()
-    return {"data": posts}
+    return posts
 
 # everytime we create something we should return a 201 status code
-@app.post("/posts", status_code=status.HTTP_201_CREATED)
-def create_posts(post: Post, db: Session = Depends(get_db)):
+@app.post("/posts", status_code=status.HTTP_201_CREATED, response_model=schemas.Post)
+def create_posts(post: schemas.PostCreate, db: Session = Depends(get_db)):
     
     # ? (old) regular SQL method for database query
     # cursor.execute("""
@@ -108,10 +93,10 @@ def create_posts(post: Post, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(new_post)
 
-    return {"data": new_post} 
+    return new_post
 
 # in order to get a specific post we should pass a path parameter
-@app.get("/posts/{id}")
+@app.get("/posts/{id}", response_model=schemas.Post)
 def get_post(id: int, db: Session = Depends(get_db)):
     # ? (old) regular SQL method for database query
     # cursor.execute(""" SELECT * FROM posts WHERE id = %s """, (str(id)))
@@ -124,7 +109,7 @@ def get_post(id: int, db: Session = Depends(get_db)):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, 
             detail=f"post with id: {id} was not found")
-    return {"post_detail": post}
+    return post
 
 @app.delete("/posts/{id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_post(id: int, db: Session = Depends(get_db)):
@@ -147,8 +132,8 @@ def delete_post(id: int, db: Session = Depends(get_db)):
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
-@app.put("/posts/{id}")
-def update_post(id: int, updated_post: Post, db: Session = Depends(get_db)):
+@app.put("/posts/{id}", response_model=schemas.Post)
+def update_post(id: int, updated_post: schemas.PostCreate, db: Session = Depends(get_db)):
 
     # ? (old) regular SQL method for database query
     # cursor.execute(""" UPDATE posts 
@@ -175,4 +160,4 @@ def update_post(id: int, updated_post: Post, db: Session = Depends(get_db)):
     
     db.commit()
 
-    return {"data": post_query.first()}
+    return post_query.first()
