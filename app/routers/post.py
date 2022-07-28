@@ -1,6 +1,7 @@
 from click import get_current_context
 from fastapi import Body, FastAPI, Response, status, HTTPException, Depends, APIRouter
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from typing import List, Optional
 from .. import models, schemas, oauth2
 from ..database import get_db
@@ -12,7 +13,7 @@ router = APIRouter(
     tags=['Posts']
 )
 
-@router.get("/", response_model=List[schemas.Post])
+@router.get("/", response_model=List[schemas.PostOut])
 def get_posts(
     db: Session = Depends(get_db), 
     current_user: dict = Depends(oauth2.get_current_user),
@@ -25,7 +26,16 @@ def get_posts(
     # ? using ORM for database query
     
     # posts = db.query(models.Post).filter(models.Post.owner_id == current_user.id).all() # ! retrieve only posts from the current user
-    posts = db.query(models.Post).filter(models.Post.title.contains(search)).limit(limit).offset(skip).all()
+
+    # posts = db.query(models.Post).filter(         # ! old 'posts' - not using joins
+    #     models.Post.title.contains(search)).limit(limit).offset(skip).all() 
+
+    posts = db.query(models.Post, func.count(models.Vote.post_id).label("votes")).join(
+        models.Vote, 
+        models.Vote.post_id == models.Post.id,
+        isouter=True).group_by(models.Post.id).filter(
+            models.Post.title.contains(search)).limit(limit).offset(skip).all()
+
     return posts
 
 # everytime we create something we should return a 201 status code
@@ -54,14 +64,20 @@ def create_posts(post: schemas.PostCreate, db: Session = Depends(get_db), curren
     return new_post
 
 # in order to get a specific post we should pass a path parameter
-@router.get("/{id}", response_model=schemas.Post)
+@router.get("/{id}", response_model=schemas.PostOut)
 def get_post(id: int, db: Session = Depends(get_db), current_user: dict = Depends(oauth2.get_current_user)):
     # ? (old) regular SQL method for database query
     # cursor.execute(""" SELECT * FROM posts WHERE id = %s """, (str(id)))
     # post = cursor.fetchone()
     
     # ? using ORM for database query
-    post = db.query(models.Post).filter(models.Post.id == id).first()
+
+    # post = db.query(models.Post).filter(models.Post.id == id).first()     # ! old 'post' - not using joins
+
+    post = db.query(models.Post, func.count(models.Vote.post_id).label("votes")).join(
+        models.Vote, 
+        models.Vote.post_id == models.Post.id,
+        isouter=True).group_by(models.Post.id).filter(models.Post.id == id).first()
 
     if not post:
         raise HTTPException(
