@@ -8,7 +8,7 @@ from .config import settings
 
 click.clear() # fix color codes on terminal
 
-models.Base.metadata.create_all(bind=engine)
+# models.Base.metadata.create_all(bind=engine) # ! no more need for this command because we implemented Alembic
 
 app = FastAPI()
 
