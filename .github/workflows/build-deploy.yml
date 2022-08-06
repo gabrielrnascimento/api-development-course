@@ -30,13 +30,13 @@ jobs:
           --health-retries 5
     runs-on: ubuntu-latest
     steps:
-      - name: pulling git repo
+      - name: Pull git repo
         uses: actions/checkout@v3
       - name: installing python version 3.9
         uses: actions/setup-python@v4
         with: 
           python-version: "3.9"
-      - name: update pip
+      - name: Update pip
         run: python -m pip install --upgrade pip
       - name: installing all dependencies
         run: pip install -r requirements.txt
@@ -61,5 +61,3 @@ jobs:
           tags: ${{ secrets.DOCKER_HUB_USERNAME }}/api-development-course:latest
           cache-from: type=registry,ref=${{ secrets.DOCKER_HUB_USERNAME }}/api-development-course:buildcache
           cache-to: type=registry,ref=${{ secrets.DOCKER_HUB_USERNAME }}/api-development-course:buildcache,mode=max
-      - name: Image digest
-        run: echo ${ {steps.docker_build.outputs.digest}}
