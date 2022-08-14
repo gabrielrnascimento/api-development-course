@@ -17,6 +17,13 @@ def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     hashed_password = utils.hash(user.password)
     user.password = hashed_password
 
+    user = db.query(models.User).filter(models.User.email == user.email).first()
+    if user:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"User already exists"
+        )
+
     new_user = models.User(**user.dict())
     db.add(new_user)
     db.commit()
